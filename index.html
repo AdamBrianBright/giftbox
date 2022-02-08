@@ -319,7 +319,7 @@
                 card_list.classList.remove('playing')
                 await sleep(500)
                 victory_screen.style.visibility = 'visible'
-                for (let el of victory_box.childNodes) el.remove()
+                while (victory_box.hasChildNodes()) victory_box.firstChild.remove()
                 victory_box.appendChild(ICONS[prize])
                 let subTitle = document.createElement('div')
                 subTitle.innerText = PRIZE_NAMES[prize]
