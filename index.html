@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#121214">
+    <title>Рулетка</title>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/normalize.css@8.0.1/normalize.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        :root {
+            --black: #121214;
+            --violet: #D325FF;
+            --yellow: #E2C52D;
+            --purple: #8525FF;
+            --dark: #414143;
+            --card: #222325;
+            --white: #FFFFFF;
+            --white-dim: #EAEAEA;
+            --line: #853CB1;
+        }
+
+        * {
+            font-family: 'Roboto', 'Helvetica', 'Helvetica-Neue', 'Arial', 'sans-serif';
+        }
+
+        body {
+            background: var(--black);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        #app {
+        }
+
+        #title {
+            color: var(--violet);
+            font-weight: 600;
+            font-size: 34px;
+            line-height: 16px;
+            text-transform: uppercase;
+        }
+
+        #subtitle {
+            color: var(--yellow);
+            font-weight: 600;
+            font-size: 20px;
+            line-height: 16px;
+            text-transform: uppercase;
+        }
+
+        #game {
+            position: relative;
+        }
+
+        #roulette {
+            width: 100%;
+            overflow-x: hidden;
+        }
+
+        #card_list {
+            display: flex;
+            margin: 0 10px;
+            height: 200px;
+            transform: translateX(0);
+        }
+
+        /*noinspection CssUnusedSymbol*/
+        #card_list.playing {
+            transition: transform 10s;
+        }
+
+        /*noinspection CssUnusedSymbol*/
+        #card_list .card {
+            flex-shrink: 0;
+            flex-grow: 0;
+            width: calc((100vw - 20px) / 3 - 20px);
+            min-width: 100px;
+            max-width: 150px;
+            height: 200px;
+            background: var(--card);
+            border-radius: 14px;
+            margin: 0 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #line {
+            background: var(--line);
+            width: 4px;
+            height: 260px;
+            border-radius: 14px;
+            position: absolute;
+            left: calc(50% + 20px);
+            top: -20px;
+            z-index: 2;
+        }
+
+        #attempts {
+            color: var(--dark);
+            font-weight: 600;
+            font-size: 18px;
+            line-height: 16px;
+        }
+
+        .btn {
+            width: 200px;
+            height: 60px;
+            border-radius: 10px;
+            background: var(--purple);
+            color: var(--white);
+            font-weight: 600;
+            font-size: 28px;
+            line-height: 16px;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 0 500px rgba(0, 0, 0, 0) inset;
+            transition: box-shadow .2s ease-in-out;
+        }
+
+        .btn:hover {
+            box-shadow: 0 0 500px rgba(0, 0, 0, 0.1) inset;
+        }
+
+        .btn:active {
+            box-shadow: 0 0 500px rgba(0, 0, 0, 0.3) inset;
+        }
+
+        .btn[disabled] {
+            box-shadow: 0 0 500px rgba(0, 0, 0, 0.6) inset;
+            color: var(--white-dim);
+        }
+
+        #victory {
+            visibility: hidden;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: var(--black);
+            z-index: 10000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        #victory > * {
+            flex-shrink: 0;
+            flex-grow: 0
+        }
+
+        #victory h1 {
+            color: var(--violet)
+        }
+
+        #victory #prize {
+            width: 300px;
+            height: 300px;
+            background: var(--card);
+            border-radius: 14px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        #victory #prize > svg {
+            width: 120px;
+            height: 120px;
+        }
+
+        #victory #prize > div {
+            color: var(--white);
+            font-weight: 600;
+            font-size: 30px;
+            margin-top: 30px;
+        }
+    </style>
+    <script type="text/javascript">
+        window.addEventListener('load', async () => {
+            function parseSVG(text) {
+                return new DOMParser().parseFromString(text, 'image/svg+xml').firstChild;
+            }
+
+            const SPAWN_CARD_AMOUNT = 300;
+            const SPAWN_CARD_PLACE = 200;
+            const PRIZE_POOL = [
+                'candy',
+                'drink',
+                'flower',
+                'unknown',
+            ].reverse()
+
+            const ICONS = {
+                drink: parseSVG(`<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M50 45.9C48.9579 46.8377 48.1247 47.9841 47.5543 49.2647C46.984 50.5453 46.6892 51.9315 46.6892 53.3333C46.6892 54.7352 46.984 56.1214 47.5543 57.402C48.1247 58.6826 48.9579 59.8289 50 60.7667V66.6667C50 68.4348 49.2976 70.1305 48.0474 71.3807C46.7971 72.6309 45.1014 73.3333 43.3333 73.3333H36.6667C34.8986 73.3333 33.2029 72.6309 31.9526 71.3807C30.7024 70.1305 30 68.4348 30 66.6667V60.7667C31.0421 59.8289 31.8753 58.6826 32.4457 57.402C33.016 56.1214 33.3108 54.7352 33.3108 53.3333C33.3108 51.9315 33.016 50.5453 32.4457 49.2647C31.8753 47.9841 31.0421 46.8377 30 45.9V30C33.3219 24.9801 35.4957 19.2894 36.3667 13.3333H33.3333V6.66666H46.6667V13.3333H43.6333C44.5043 19.2894 46.6781 24.9801 50 30V45.9Z" fill="#0CA312"/></svg>`),
+                dance: parseSVG(`<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M46.6667 11.6667C46.6667 14.4333 44.4333 16.6667 41.6667 16.6667C38.9 16.6667 36.6667 14.4333 36.6667 11.6667C36.6667 8.89999 38.9 6.66666 41.6667 6.66666C44.4333 6.66666 46.6667 8.89999 46.6667 11.6667ZM28.3333 16.6667C25.5667 16.6667 23.3333 18.9 23.3333 21.6667C23.3333 24.4333 25.5667 26.6667 28.3333 26.6667C31.1 26.6667 33.3333 24.4333 33.3333 21.6667C33.3333 18.9 31.1 16.6667 28.3333 16.6667ZM46.6667 40L44.0667 32.5H53.9333L61.1333 28.9C62.3667 28.3333 62.8667 26.8 62.2333 25.5667C61.6667 24.3333 60.1333 23.8 58.9 24.4333L56.1667 25.8L54.5333 23C53.5667 20.8333 51.2 19.6 48.8667 20.1333L40.6333 21.9C38.3333 22.4 36.6667 24.5 36.6667 26.9V29.2333L28.5667 34.6333H28.6C28.3333 34.8667 27.9667 35.1667 27.7667 35.5667L24.8 41.4667L18.8667 44.4333C17.6333 45 17.1333 46.5667 17.7667 47.8C18.2 48.6667 19.1 49.1667 20 49.1667C20.3667 49.1667 20.7667 49.1 21.1333 48.9L28.5333 45.2L32 38.3333L36.6667 43.3333C33.3333 53.3333 10 66.6667 10 66.6667C10 66.6667 23.3333 73.3333 40 73.3333C56.6667 73.3333 70 66.6667 70 66.6667C70 66.6667 53.3333 53.3333 46.6667 40ZM56.1667 36.9667L55.1 37.5H51.1L51.3 38.0333C53.0333 41.4667 55.5667 45 58.3333 48.1333L56.5667 36.7667L56.1667 36.9667Z" fill="#FF5A43"/></svg>`),
+                candy: parseSVG(`<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M51.8002 28.2C58.3336 34.7333 58.3336 45.2667 51.8002 51.8C45.2669 58.3334 34.7336 58.3334 28.2336 51.8C21.7336 45.2667 21.6669 34.7333 28.2336 28.2C34.8002 21.6667 45.2669 21.6667 51.8002 28.2ZM64.9002 15.1667C64.9002 15.1667 61.6669 15.5667 58.1002 17.8667C57.6002 14.4 55.9336 10.9 53.1002 8.06668C48.9336 12.2 48.4336 17.4 49.4336 21.1333C54.0669 22.3333 57.6669 25.9333 58.8669 30.5667C62.6002 31.5667 67.8002 31.0667 71.9336 26.9C69.1336 24.1 65.7002 22.4667 62.2669 21.9333C63.5669 20 64.6002 17.7667 64.9002 15.1667ZM15.1002 64.8334C15.1002 64.8334 18.3336 64.4333 21.9002 62.1333C22.4002 65.6 24.0669 69.1 26.9002 71.9333C31.0669 67.8 31.5669 62.6 30.5669 58.8667C25.9336 57.6667 22.3336 54.0667 21.1336 49.4333C17.4002 48.4333 12.2002 48.9333 8.06689 53.1C10.8669 55.9 14.3002 57.5667 17.7336 58.0667C16.4336 60 15.4002 62.2667 15.1002 64.8334Z" fill="#FFB547"/></svg>`),
+                car: parseSVG(`<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16.6667 36.6667L21.6667 21.6667H58.3333L63.3333 36.6667H16.6667ZM58.3333 53.3333C57.0072 53.3333 55.7355 52.8065 54.7978 51.8689C53.8601 50.9312 53.3333 49.6594 53.3333 48.3333C53.3333 47.0072 53.8601 45.7355 54.7978 44.7978C55.7355 43.8601 57.0072 43.3333 58.3333 43.3333C59.6594 43.3333 60.9312 43.8601 61.8689 44.7978C62.8065 45.7355 63.3333 47.0072 63.3333 48.3333C63.3333 49.6594 62.8065 50.9312 61.8689 51.8689C60.9312 52.8065 59.6594 53.3333 58.3333 53.3333ZM21.6667 53.3333C20.3406 53.3333 19.0688 52.8065 18.1311 51.8689C17.1935 50.9312 16.6667 49.6594 16.6667 48.3333C16.6667 47.0072 17.1935 45.7355 18.1311 44.7978C19.0688 43.8601 20.3406 43.3333 21.6667 43.3333C22.9927 43.3333 24.2645 43.8601 25.2022 44.7978C26.1399 45.7355 26.6667 47.0072 26.6667 48.3333C26.6667 49.6594 26.1399 50.9312 25.2022 51.8689C24.2645 52.8065 22.9927 53.3333 21.6667 53.3333ZM63.0667 20C62.4 18.0667 60.5333 16.6667 58.3333 16.6667H21.6667C19.4667 16.6667 17.6 18.0667 16.9333 20L10 40V66.6667C10 67.5507 10.3512 68.3986 10.9763 69.0237C11.6014 69.6488 12.4493 70 13.3333 70H16.6667C17.5507 70 18.3986 69.6488 19.0237 69.0237C19.6488 68.3986 20 67.5507 20 66.6667V63.3333H60V66.6667C60 67.5507 60.3512 68.3986 60.9763 69.0237C61.6014 69.6488 62.4493 70 63.3333 70H66.6667C67.5507 70 68.3986 69.6488 69.0237 69.0237C69.6488 68.3986 70 67.5507 70 66.6667V40L63.0667 20Z" fill="#DCDCDC"/></svg>`),
+                flower: parseSVG(`<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 43.3333C10 51.2898 13.1607 58.9204 18.7868 64.5465C24.4129 70.1726 32.0435 73.3333 40 73.3333C40 56.6667 26.5667 43.3333 10 43.3333ZM40 18.3333C42.2101 18.3333 44.3298 19.2113 45.8926 20.7741C47.4554 22.3369 48.3333 24.4565 48.3333 26.6667C48.3333 28.8768 47.4554 30.9964 45.8926 32.5592C44.3298 34.122 42.2101 35 40 35C37.7899 35 35.6702 34.122 34.1074 32.5592C32.5446 30.9964 31.6667 28.8768 31.6667 26.6667C31.6667 24.4565 32.5446 22.3369 34.1074 20.7741C35.6702 19.2113 37.7899 18.3333 40 18.3333ZM18.6667 34.1667C18.6667 36.3768 19.5446 38.4964 21.1074 40.0592C22.6702 41.622 24.7899 42.5 27 42.5C28.7667 42.5 30.4 41.9333 31.6667 41.0333C31.6667 41.2333 31.6667 41.4333 31.6667 41.6667C31.6667 43.8768 32.5446 45.9964 34.1074 47.5592C35.6702 49.122 37.7899 50 40 50C42.2101 50 44.3298 49.122 45.8926 47.5592C47.4554 45.9964 48.3333 43.8768 48.3333 41.6667C48.3333 41.4333 48.3333 41.2333 48.3333 41.0333C49.6 41.9333 51.2333 42.5 53 42.5C57.6 42.5 61.3333 38.7667 61.3333 34.1667C61.3333 30.8333 59.3667 28 56.5667 26.6667C59.3667 25.3333 61.3333 22.4667 61.3333 19.1667C61.3333 14.5667 57.6 10.8333 53 10.8333C51.2333 10.8333 49.6 11.3667 48.3333 12.3C48.3333 12.1 48.3333 11.8667 48.3333 11.6667C48.3333 9.45653 47.4554 7.33692 45.8926 5.77411C44.3298 4.21131 42.2101 3.33334 40 3.33334C37.7899 3.33334 35.6702 4.21131 34.1074 5.77411C32.5446 7.33692 31.6667 9.45653 31.6667 11.6667C31.6667 11.8667 31.6667 12.1 31.6667 12.3C30.4 11.3667 28.7667 10.8333 27 10.8333C24.7899 10.8333 22.6702 11.7113 21.1074 13.2741C19.5446 14.8369 18.6667 16.9565 18.6667 19.1667C18.6667 22.4667 20.6333 25.3333 23.4333 26.6667C20.6333 28 18.6667 30.8333 18.6667 34.1667ZM40 73.3333C47.9565 73.3333 55.5871 70.1726 61.2132 64.5465C66.8393 58.9204 70 51.2898 70 43.3333C53.3333 43.3333 40 56.6667 40 73.3333Z" fill="#FF50ED"/></svg>`),
+                money: parseSVG(`<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16.6668 20H76.6668V60H16.6668V20ZM46.6668 30C49.319 30 51.8625 31.0536 53.7379 32.9289C55.6133 34.8043 56.6668 37.3478 56.6668 40C56.6668 42.6522 55.6133 45.1957 53.7379 47.0711C51.8625 48.9464 49.319 50 46.6668 50C44.0147 50 41.4711 48.9464 39.5958 47.0711C37.7204 45.1957 36.6668 42.6522 36.6668 40C36.6668 37.3478 37.7204 34.8043 39.5958 32.9289C41.4711 31.0536 44.0147 30 46.6668 30V30ZM30.0002 26.6667C30.0002 28.4348 29.2978 30.1305 28.0475 31.3807C26.7973 32.631 25.1016 33.3333 23.3335 33.3333V46.6667C25.1016 46.6667 26.7973 47.369 28.0475 48.6193C29.2978 49.8695 30.0002 51.5652 30.0002 53.3333H63.3335C63.3335 51.5652 64.0359 49.8695 65.2861 48.6193C66.5364 47.369 68.232 46.6667 70.0002 46.6667V33.3333C68.232 33.3333 66.5364 32.631 65.2861 31.3807C64.0359 30.1305 63.3335 28.4348 63.3335 26.6667H30.0002ZM3.3335 33.3333H10.0002V66.6667H63.3335V73.3333H3.3335V33.3333Z" fill="#26B556"/></svg>`),
+                console: parseSVG(`<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M23.3332 3.33334C19.6665 3.33334 16.6665 6.33334 16.6665 10V70C16.6665 73.7 19.6665 76.6667 23.3332 76.6667H46.6665C55.8665 76.6667 63.3332 69.2 63.3332 60V10C63.3332 6.33334 60.3665 3.33334 56.6665 3.33334H23.3332ZM26.6665 13.3333H53.3332V36.6667H26.6665V13.3333ZM29.9998 46.6667H33.3332V53.3333H39.9998V56.6667H33.3332V63.3333H29.9998V56.6667H23.3332V53.3333H29.9998V46.6667ZM53.3332 50C55.1665 50 56.6665 51.5 56.6665 53.3333C56.6665 55.1667 55.1665 56.6667 53.3332 56.6667C51.4998 56.6667 49.9998 55.1667 49.9998 53.3333C49.9998 51.5 51.4998 50 53.3332 50ZM46.6665 56.6667C48.4998 56.6667 49.9998 58.1667 49.9998 60C49.9998 61.8333 48.4998 63.3333 46.6665 63.3333C44.8332 63.3333 43.3332 61.8333 43.3332 60C43.3332 58.1667 44.8332 56.6667 46.6665 56.6667Z" fill="#FFE144"/></svg>`),
+                plane: parseSVG(`<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M68.5333 13.0333C70.5 15 70.5 18.1667 68.5333 20.1L55.5666 33.0667L62.6333 63.7L57.9333 68.4333L45 43.6667L32 56.6667L33.2 64.9L29.6333 68.4333L23.7666 57.8333L13.1333 51.9333L16.6666 48.3333L25 49.5667L37.9 36.6667L13.1333 23.6333L17.8666 18.9333L48.5 26L61.4666 13.0333C63.3333 11.1 66.6666 11.1 68.5333 13.0333Z" fill="white"/></svg>`),
+                balloon: parseSVG(`<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M36.6668 76.6667C34.8987 76.6667 33.203 75.9643 31.9528 74.714C30.7025 73.4638 30.0002 71.7681 30.0002 70V63.3333H50.0002V70C50.0002 71.7681 49.2978 73.4638 48.0475 74.714C46.7973 75.9643 45.1016 76.6667 43.3335 76.6667H36.6668ZM40.0002 3.33334C42.3668 3.33334 44.6335 3.63334 46.8335 4.2C50.7335 9.43334 53.3335 19.0333 53.3335 30C53.3335 37.6 52.0668 44.5667 50.0002 53.3333C50.0002 55.1014 49.2978 56.7971 48.0475 58.0474C46.7973 59.2976 45.1016 60 43.3335 60H36.6668C34.8987 60 33.203 59.2976 31.9528 58.0474C30.7025 56.7971 30.0002 55.1014 30.0002 53.3333C27.9335 44.5667 26.6668 37.6 26.6668 30C26.6668 19.0333 29.2668 9.43334 33.1668 4.2C35.3668 3.63334 37.6335 3.33334 40.0002 3.33334ZM66.6668 26.6667C66.6668 37.2667 60.5002 53.0667 51.5335 57.3667C54.7002 51.3 56.6668 39.4333 56.6668 30C56.6668 20.5667 54.7002 12.0333 51.5335 5.96667C60.5002 10.2667 66.6668 16.0667 66.6668 26.6667ZM13.3335 26.6667C13.3335 16.0667 19.5002 10.2667 28.4668 5.96667C25.3002 12.0333 23.3335 20.5667 23.3335 30C23.3335 39.4333 25.3002 51.3 28.4668 57.3667C19.5002 53.0667 13.3335 37.2667 13.3335 26.6667Z" fill="#FF4848"/></svg>`),
+                apple: parseSVG(`<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M62.3666 65C59.6 69.1333 56.6667 73.1667 52.2 73.2333C47.7333 73.3333 46.3 70.6 41.2333 70.6C36.1333 70.6 34.5667 73.1667 30.3333 73.3333C25.9666 73.5 22.6666 68.9333 19.8666 64.9C14.1666 56.6667 9.79998 41.5 15.6666 31.3C18.5666 26.2333 23.7666 23.0333 29.4 22.9333C33.6666 22.8667 37.7333 25.8333 40.3666 25.8333C42.9666 25.8333 47.9 22.2667 53.0667 22.8C55.2333 22.9 61.3 23.6667 65.2 29.4C64.9 29.6 57.9667 33.6667 58.0333 42.1C58.1333 52.1667 66.8666 55.5333 66.9666 55.5667C66.8666 55.8 65.5666 60.3667 62.3666 65ZM43.3333 11.6667C45.7667 8.89999 49.8 6.79999 53.1333 6.66666C53.5667 10.5667 52 14.5 49.6666 17.3C47.3666 20.1333 43.5667 22.3333 39.8333 22.0333C39.3333 18.2 41.2 14.2 43.3333 11.6667Z" fill="white"/></svg>`),
+                cake: parseSVG(`<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M38.3335 1.66666C40.0002 2.49999 43.3335 7.99999 43.3335 11.6667C43.3335 15.3333 41.1002 16.6667 38.3335 16.6667C35.5668 16.6667 33.3335 16.1667 33.3335 12.5C33.3335 8.83332 36.6668 6.66666 38.3335 1.66666ZM61.6668 30C70.0002 30 76.6668 36.6667 76.6668 45C76.6668 50.2 74.0335 54.7667 70.0002 57.4667V76.6667H40.0002H10.0002V57.4667C5.96683 54.7667 3.3335 50.2 3.3335 45C3.3335 36.6667 10.0002 30 18.3335 30H33.3335V20H43.3335V30H61.6668ZM40.0002 53.3333C42.2103 53.3333 44.3299 52.4553 45.8927 50.8925C47.4555 49.3297 48.3335 47.2101 48.3335 45H53.3335C53.3335 47.2101 54.2115 49.3297 55.7743 50.8925C57.3371 52.4553 59.4567 53.3333 61.6668 53.3333C63.877 53.3333 65.9966 52.4553 67.5594 50.8925C69.1222 49.3297 70.0002 47.2101 70.0002 45C70.0002 42.7899 69.1222 40.6702 67.5594 39.1074C65.9966 37.5446 63.877 36.6667 61.6668 36.6667H18.3335C16.1234 36.6667 14.0037 37.5446 12.4409 39.1074C10.8781 40.6702 10.0002 42.7899 10.0002 45C10.0002 47.2101 10.8781 49.3297 12.4409 50.8925C14.0037 52.4553 16.1234 53.3333 18.3335 53.3333C20.5436 53.3333 22.6632 52.4553 24.2261 50.8925C25.7889 49.3297 26.6668 47.2101 26.6668 45H31.6668C31.6668 47.2101 32.5448 49.3297 34.1076 50.8925C35.6704 52.4553 37.79 53.3333 40.0002 53.3333V53.3333Z" fill="#67FFDB"/></svg>`),
+                unknown: parseSVG(`<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M33.3333 63.3333H43.3333V73.3333H33.3333V63.3333ZM40 6.66666C57.8333 7.39999 65.6 25.4 55 38.9C52.2333 42.2333 47.7667 44.4333 45.5667 47.2333C43.3333 50 43.3333 53.3333 43.3333 56.6667H33.3333C33.3333 51.1 33.3333 46.4 35.5667 43.0667C37.7667 39.7333 42.2333 37.7667 45 35.5667C53.0667 28.1 51.0667 17.5333 40 16.6667C37.3478 16.6667 34.8043 17.7202 32.9289 19.5956C31.0536 21.471 30 24.0145 30 26.6667H20C20 21.3623 22.1071 16.2752 25.8579 12.5245C29.6086 8.77379 34.6957 6.66666 40 6.66666V6.66666Z" fill="#3F3F3F"/></svg>`),
+            }
+            const PRIZE_NAMES = {
+                drink: 'Напиток',
+                dance: 'Танец',
+                candy: 'Конфеты',
+                car: 'Машина',
+                flower: 'Цветы',
+                money: 'Деньги',
+                console: 'Консоль',
+                plane: 'Билеты',
+                balloon: 'Путешествие',
+                apple: 'iPhone',
+                cake: 'Торт',
+                unknown: 'Сюрприз',
+            }
+
+            const sleep = (time) => new Promise((res, _) => {
+                setTimeout(res, time)
+            })
+
+            function getRandomPrize(obj) {
+                let keys = Object.keys(obj);
+                return keys[keys.length * Math.random() << 0];
+            }
+
+            const title = document.querySelector('#title')
+            const card_list = document.querySelector('#card_list')
+            const play_btn = document.querySelector('#play')
+            const back_btn = document.querySelector('#goBack')
+            const victory_screen = document.querySelector('#victory')
+            const victory_box = document.querySelector('#prize')
+            const attempt_counter = document.querySelector('#attempt_counter')
+            const line = document.querySelector('#line')
+
+            function setAttemptAmount(amount) {
+                prizes_left = amount
+                attempt_counter.textContent = amount
+                localStorage.setItem('prizes_left', amount.toString())
+            }
+
+            function spawnCard(prize_name) {
+                let card = document.createElement('div')
+                card.className = 'card'
+                card.dataset.prize = prize_name
+                let prize = ICONS[prize_name].cloneNode(true)
+                card.appendChild(prize)
+                card_list.appendChild(card)
+            }
+
+            function spawnCards(prize_name) {
+                for (let i = 0; i < SPAWN_CARD_AMOUNT; i++) {
+                    if (i === SPAWN_CARD_PLACE) {
+                        spawnCard(prize_name)
+                    } else {
+                        let rand_prize = getRandomPrize(ICONS)
+                        spawnCard(rand_prize)
+                    }
+                }
+            }
+
+            function resetCardList() {
+                while (card_list.hasChildNodes()) {
+                    card_list.firstChild.remove()
+                }
+            }
+
+            let prizes_left = localStorage.getItem('prizes_left');
+            prizes_left = prizes_left === null ? PRIZE_POOL.length : parseInt(prizes_left);
+            setAttemptAmount(prizes_left)
+
+            let title_clicked = 0
+            title.addEventListener('click', function (e) {
+                e.preventDefault()
+                title_clicked++
+                if (title_clicked === 5) {
+                    setAttemptAmount(PRIZE_POOL.length)
+                    title_clicked = 0
+                }
+            }, false)
+
+            spawnCards(getRandomPrize(ICONS))
+            play_btn.onclick = async (e) => {
+                e.preventDefault()
+                if (card_list.classList.contains('playing')) return
+                if (prizes_left <= 0) {
+                    Swal.fire({
+                        text: 'Все попытки использованы',
+                        color: 'var(--white)',
+                        background: 'var(--card)',
+                        confirmButtonColor: 'var(--purple)'
+                    })
+                    return;
+                }
+                setAttemptAmount(prizes_left - 1)
+
+                card_list.style.transform = `translateX(0)`
+                resetCardList()
+                let prize = PRIZE_POOL[prizes_left];
+                spawnCards(prize)
+                let bb = document.querySelectorAll('.card')[SPAWN_CARD_PLACE].getBoundingClientRect()
+                const WIDTH = (bb.right - bb.left) + 20
+                const scroll = line.getBoundingClientRect().x - bb.x - WIDTH / 2
+                card_list.classList.add('playing')
+                card_list.style.transform = `translateX(${scroll}px)`
+                await sleep(10 * 1000)
+                card_list.classList.remove('playing')
+                await sleep(500)
+                victory_screen.style.visibility = 'visible'
+                for (let el of victory_box.childNodes) el.remove()
+                victory_box.appendChild(ICONS[prize])
+                let subTitle = document.createElement('div')
+                subTitle.innerText = PRIZE_NAMES[prize]
+                victory_box.appendChild(subTitle)
+            }
+
+            back_btn.onclick = async (e) => {
+                e.preventDefault()
+                victory_screen.style.visibility = 'hidden'
+            }
+        })
+    </script>
+</head>
+<body>
+<div id="app">
+    <div id="victory">
+        <h1>ВЫ ВЫИГРАЛИ:</h1>
+        <div style="height: 90px"></div>
+        <div id="prize"></div>
+        <div style="height: 90px"></div>
+        <button id="goBack" class="btn">К рулетке</button>
+    </div>
+    <h1 id="title">Кейсы подарков</h1>
+    <h2 id="subtitle">Крути и получай призы</h2>
+    <div style="height: 90px"></div>
+    <div id="game">
+        <div id="line"></div>
+        <div id="roulette">
+            <div id="card_list">
+            </div>
+        </div>
+    </div>
+    <div style="height: 70px"></div>
+    <div id="attempts">У вас осталось попыток: <span id="attempt_counter">0</span></div>
+    <div style="height: 70px"></div>
+    <button id="play" class="btn">Крутить</button>
+</div>
+</body>
+</html>
